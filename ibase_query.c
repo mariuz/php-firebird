@@ -1173,7 +1173,7 @@ PHP_FUNCTION(ibase_query)
 		return;
 	}
 
-	assert(false && "UNREACHABLE");
+	assert(0 && "UNREACHABLE");
 
 _php_ibase_query_error:
 	zend_list_delete(ib_query->res);
@@ -1317,7 +1317,7 @@ static int _php_ibase_var_zval(zval *val, void *data, int type, int len, /* {{{ 
 			// connect if fbclient does not have fb_get_master_instance().
 			// Assert this just in case.
 			if(!IBG(master_instance)) {
-				assert(false && "UNREACHABLE");
+				assert(0 && "UNREACHABLE");
 			}
 
 			char timeZoneBuffer[40] = {0};
