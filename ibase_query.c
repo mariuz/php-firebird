@@ -271,6 +271,7 @@ static int _php_ibase_prepare(ibase_query **new_query, ibase_db_link *link, /* {
 		goto _php_ibase_alloc_query_error;
 	}
 
+	// TODO: provide query_len
 	if (isc_dsql_prepare(IB_STATUS, &ib_query->trans->handle, &ib_query->stmt,
 			0, query, link->dialect, NULL)) {
 		IBDEBUG("isc_dsql_prepare() failed\n");
@@ -900,6 +901,8 @@ static int _php_ibase_exec(INTERNAL_FUNCTION_PARAMETERS, ibase_query *ib_query, 
 	/* Have we used this cursor before and it's still open (exec proc has no cursor) ? */
 	if (ib_query->is_open && ib_query->statement_type != isc_info_sql_stmt_exec_procedure) {
 		IBDEBUG("Implicitly closing a cursor");
+		// TODO: ini configurable warning
+		// php_error_docref(NULL, E_NOTICE, "Implicitly closing a cursor");
 		if (isc_dsql_free_statement(IB_STATUS, &ib_query->stmt, DSQL_close)) {
 			_php_ibase_error();
 			return FAILURE;
