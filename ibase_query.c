@@ -1873,14 +1873,18 @@ static void _php_ibase_field_info(zval *return_value, ibase_query *ib_query, int
 	if(IBG(master_instance) && IBG(get_statement_interface)) {
 		void *statement = NULL;
 		if(((fb_get_statement_interface_t)IBG(get_statement_interface))(IB_STATUS, &statement, &ib_query->stmt)){
+			fbu_release_statement(statement);
 			_php_ibase_error();
 			RETURN_FALSE;
 		}
 
 		if(fbu_insert_field_info(IBG(master_instance), IB_STATUS, is_outvar, num, return_value, statement)){
+			fbu_release_statement(statement);
 			_php_ibase_error();
 			RETURN_FALSE;
 		}
+
+		fbu_release_statement(statement);
 	} else {
 #endif
 		// Old API
@@ -2174,12 +2178,16 @@ static int _php_ibase_alloc_ht_aliases(ibase_query *ib_query)
 	if(IBG(master_instance) && IBG(get_statement_interface)) {
 		void *statement = NULL;
 		if(((fb_get_statement_interface_t)IBG(get_statement_interface))(IB_STATUS, &statement, &ib_query->stmt)){
+			fbu_release_statement(statement);
 			return FAILURE;
 		}
 
 		if(fbu_insert_aliases(IBG(master_instance), IB_STATUS, ib_query, statement)){
+			fbu_release_statement(statement);
 			return FAILURE;
 		}
+
+		fbu_release_statement(statement);
 	} else {
 #endif
 		// Old API

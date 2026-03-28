@@ -46,6 +46,7 @@ int fbu_insert_field_info(void *master_ptr, ISC_STATUS* st, int is_outvar, int n
   zval *into_array, void *statement_ptr);
 int fbu_insert_aliases(void *master_ptr, ISC_STATUS* st, ibase_query *ib_query,
   void *statement_ptr);
+void fbu_release_statement(void *statement_ptr);
 
 #endif // FB_API_VER >= 30
 

@@ -86,6 +86,12 @@ extern "C" void fbu_decode_timestamp_tz(void *master_ptr, const ISC_TIMESTAMP_TZ
 							timeZoneBufferLength, timeZoneBuffer);
 }
 
+extern "C" void fbu_release_statement(void *statement_ptr)
+{
+	Firebird::IStatement* statement = (Firebird::IStatement *)statement_ptr;
+	if (statement) statement->release();
+}
+
 extern "C" int fbu_insert_aliases(void *master_ptr, ISC_STATUS* st, ibase_query *ib_query, void *statement_ptr)
 {
 	Firebird::IMaster* master = (Firebird::IMaster*)master_ptr;
