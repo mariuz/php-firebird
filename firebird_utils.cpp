@@ -121,6 +121,8 @@ extern "C" int fbu_insert_aliases(void *master_ptr, ISC_STATUS* st, ibase_query 
 		}
 	}
 
+	status.dispose();
+
 	return 0;
 }
 
@@ -158,6 +160,8 @@ extern "C" int fbu_insert_field_info(void *master_ptr, ISC_STATUS* st, int is_ou
 			return st[1];
 		}
 	}
+
+	status.dispose();
 
 	return 0;
 }
