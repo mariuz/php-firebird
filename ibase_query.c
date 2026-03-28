@@ -81,6 +81,11 @@ static void _php_ibase_free_query(ibase_query *ib_query) /* {{{ */
 {
 	IBDEBUG("Freeing query...");
 
+	if (ib_query->stmt) {
+		ISC_STATUS_ARRAY status;
+		isc_dsql_free_statement(status, &ib_query->stmt, DSQL_drop);
+	}
+
 	if(ib_query->out_nullind)efree(ib_query->out_nullind);
 	if(ib_query->bind_buf)efree(ib_query->bind_buf);
 	if(ib_query->in_sqlda)efree(ib_query->in_sqlda); // Note to myself: no need for _php_ibase_free_xsqlda()
@@ -1173,6 +1178,8 @@ PHP_FUNCTION(ibase_query)
 
 		ib_query->was_result_once = 1;
 
+		zend_list_delete(ib_query->res);
+
 		return;
 	}
 
@@ -1754,7 +1761,7 @@ PHP_FUNCTION(ibase_prepare)
 	}
 
 	RETVAL_RES(ib_query->res);
-	Z_TRY_ADDREF_P(return_value);
+	// Z_TRY_ADDREF_P(return_value);
 }
 /* }}} */
 
@@ -1780,6 +1787,10 @@ PHP_FUNCTION(ibase_execute)
 
 	// was do {
 		_php_ibase_exec(INTERNAL_FUNCTION_PARAM_PASSTHRU, ib_query, args, bind_n);
+
+		if (Z_TYPE_P(return_value) == IS_RESOURCE) {
+			Z_TRY_ADDREF_P(return_value);
+		}
 
 		/* free the query if trans handle was released */
 		// if (ib_query->trans->handle == 0) {
