@@ -62,8 +62,7 @@ extern int le_link, le_plink, le_trans;
 #define LE_QUERY "Firebird/InterBase query"
 #define LE_SCVH  "Firebird/InterBase service manager handle"
 
-#define IBASE_MSGSIZE 512
-#define MAX_ERRMSG (IBASE_MSGSIZE*2)
+#define MAX_ERRMSG (1024*4)
 
 #define IB_DEF_DATE_FMT "%Y-%m-%d"
 #define IB_DEF_TIME_FMT "%H:%M:%S"
