@@ -110,6 +110,8 @@ extern "C" int fbu_insert_aliases(void *master_ptr, ISC_STATUS* st, ibase_query 
 		{
 			_php_ibase_insert_alias(ib_query->ht_aliases, meta->getAlias(&status, i));
 		}
+
+		meta->release();
 	}
 	catch (const Firebird::FbException& error)
 	{
@@ -146,6 +148,8 @@ extern "C" int fbu_insert_field_info(void *master_ptr, ISC_STATUS* st, int is_ou
 
 		add_index_string(into_array, 2, meta->getRelation(&status, num));
 		add_assoc_string(into_array, "relation", meta->getRelation(&status, num));
+
+		meta->release();
 	}
 	catch (const Firebird::FbException& error)
 	{
