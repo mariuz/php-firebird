@@ -1034,6 +1034,7 @@ int _php_ibase_attach_db(char **args, size_t *len, zend_long *largs, isc_db_hand
 	buf_len -= dpb_len;
 #endif
 
+	fbp_dump_buffer(sizeof(dpb_buffer), dpb_buffer); // TODO: debug, remove
 	if (isc_attach_database(IB_STATUS, (short)len[DB], args[DB], db, (short)(dpb-dpb_buffer), dpb_buffer)) {
 		_php_ibase_error();
 		return FAILURE;
