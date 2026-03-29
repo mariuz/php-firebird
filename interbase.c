@@ -1023,18 +1023,18 @@ int _php_ibase_attach_db(char **args, size_t *len, zend_long *largs, isc_db_hand
 		const char compat[] = "INT128 TO VARCHAR;DECFLOAT TO VARCHAR";
 		compat_buf = compat;
 		compat_buf_size = sizeof(compat) - 1;
+		dpb_len = slprintf(dpb, buf_len, "%c%c%s", isc_dpb_set_bind, compat_buf_size, compat_buf);
 	} else {
 		const char compat[] = "INT128 TO VARCHAR;DECFLOAT TO VARCHAR;TIME ZONE TO LEGACY";
 		compat_buf = compat;
 		compat_buf_size = sizeof(compat) - 1;
+		dpb_len = slprintf(dpb, buf_len, "%c%c%s", isc_dpb_set_bind, compat_buf_size, compat_buf);
 	}
 
-	dpb_len = slprintf(dpb, buf_len, "%c%c%s", isc_dpb_set_bind, compat_buf_size, compat_buf);
 	dpb += dpb_len;
 	buf_len -= dpb_len;
 #endif
 
-	fbp_dump_buffer(sizeof(dpb_buffer), dpb_buffer); // TODO: debug, remove
 	if (isc_attach_database(IB_STATUS, (short)len[DB], args[DB], db, (short)(dpb-dpb_buffer), dpb_buffer)) {
 		_php_ibase_error();
 		return FAILURE;
