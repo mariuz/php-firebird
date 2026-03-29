@@ -995,45 +995,44 @@ int _php_ibase_attach_db(char **args, size_t *len, zend_long *largs, isc_db_hand
 
 	for (i = 0; i < sizeof(dpb_args); ++i) {
 		if (dpb_args[i] && args[i] && len[i] && buf_len > 0) {
-			dpb_len = slprintf(dpb, buf_len, "%c%c%s", dpb_args[i],(unsigned char)len[i],args[i]);
+			dpb_len = snprintf(dpb, buf_len, "%c%c%s", dpb_args[i],(unsigned char)len[i],args[i]);
 			dpb += dpb_len;
 			buf_len -= dpb_len;
 		}
 	}
 	if (largs[BUF] && buf_len > 0) {
-		dpb_len = slprintf(dpb, buf_len, "%c\2%c%c", isc_dpb_num_buffers,
+		dpb_len = snprintf(dpb, buf_len, "%c\2%c%c", isc_dpb_num_buffers,
 			(char)(largs[BUF] >> 8), (char)(largs[BUF] & 0xff));
 		dpb += dpb_len;
 		buf_len -= dpb_len;
 	}
 	if (largs[SYNC] && buf_len > 0) {
-		dpb_len = slprintf(dpb, buf_len, "%c\1%c", isc_dpb_force_write, largs[SYNC] == isc_spb_prp_wm_sync);
+		dpb_len = snprintf(dpb, buf_len, "%c\1%c", isc_dpb_force_write, largs[SYNC] == isc_spb_prp_wm_sync);
 		dpb += dpb_len;
 		buf_len -= dpb_len;
 	}
 
 #if FB_API_VER >= 40
-	const char *compat_buf;
-	char compat_buf_size;
+	if (buf_len > 0) {
+		// ibase_query(): Data type unknown
+		// If fbclient >= 4 then convert to VARCHAR at server only INT128 and DECFLOAT
+		// If we have older client, convert also timezone types
+		if(IBG(client_major_version) >= 4) {
+			const char compat[] = "INT128 TO VARCHAR;DECFLOAT TO VARCHAR";
+			dpb_len = snprintf(dpb, buf_len, "%c%c%s", isc_dpb_set_bind, (unsigned char)(sizeof(compat) - 1), compat);
+		} else {
+			const char compat[] = "INT128 TO VARCHAR;DECFLOAT TO VARCHAR;TIME ZONE TO LEGACY";
+			dpb_len = snprintf(dpb, buf_len, "%c%c%s", isc_dpb_set_bind, (unsigned char)(sizeof(compat) - 1), compat);
+		}
 
-	// ibase_query(): Data type unknown
-	// If fbclient >= 4 then convert to VARCHAR at server only INT128 and DECFLOAT
-	// If we have older client, convert also timezone types
-	if(IBG(client_major_version) >= 4) {
-		const char compat[] = "INT128 TO VARCHAR;DECFLOAT TO VARCHAR";
-		compat_buf = compat;
-		compat_buf_size = sizeof(compat) - 1;
-		dpb_len = slprintf(dpb, buf_len, "%c%c%s", isc_dpb_set_bind, compat_buf_size, compat_buf);
-	} else {
-		const char compat[] = "INT128 TO VARCHAR;DECFLOAT TO VARCHAR;TIME ZONE TO LEGACY";
-		compat_buf = compat;
-		compat_buf_size = sizeof(compat) - 1;
-		dpb_len = slprintf(dpb, buf_len, "%c%c%s", isc_dpb_set_bind, compat_buf_size, compat_buf);
+		dpb += dpb_len;
+		buf_len -= dpb_len;
 	}
-
-	dpb += dpb_len;
-	buf_len -= dpb_len;
 #endif
+
+	if (buf_len < 0) {
+		fbp_fatal("ibase_connect(): DPB buffer overflow (connection parameters exceed internal buffer size)");
+	}
 
 	if (isc_attach_database(IB_STATUS, (short)len[DB], args[DB], db, (short)(dpb-dpb_buffer), dpb_buffer)) {
 		_php_ibase_error();
