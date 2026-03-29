@@ -571,6 +571,8 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 	// XSQLDA *sqlda = ib_query->in_sqlda;
 	int i, array_cnt = 0, rv = SUCCESS;
 
+	assert(ib_query->in_fields_count > 0);
+
 	for (i = 0; i < ib_query->in_sqlda->sqld; ++i) { /* bound vars */
 		zval *b_var = &b_vars[i];
 		XSQLVAR *var = &ib_query->in_sqlda->sqlvar[i];
