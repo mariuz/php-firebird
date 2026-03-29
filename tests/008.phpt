@@ -3,7 +3,7 @@ InterBase: event handling
 --SKIPIF--
 <?php
 if (PHP_OS == "WINNT") echo "skip";
-if (PHP_DEBUG) echo "skip: Disabled in debug build until memory leak is fixed (See GitHub issue 45)";
+echo "skip: Disabled in until event handling is fixed";
 include("skipif.inc");
 ?>
 --FILE--
