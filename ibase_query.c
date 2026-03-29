@@ -567,20 +567,19 @@ static int _php_ibase_bind_array(zval *val, char *buf, zend_ulong buf_size, /* {
 
 static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 {
-	BIND_BUF *buf = ib_query->bind_buf;
-	XSQLDA *sqlda = ib_query->in_sqlda;
-
+	// BIND_BUF *buf = ib_query->bind_buf;
+	// XSQLDA *sqlda = ib_query->in_sqlda;
 	int i, array_cnt = 0, rv = SUCCESS;
 
-	for (i = 0; i < sqlda->sqld; ++i) { /* bound vars */
+	for (i = 0; i < ib_query->in_sqlda->sqld; ++i) { /* bound vars */
 		zval *b_var = &b_vars[i];
-		XSQLVAR *var = &sqlda->sqlvar[i];
+		XSQLVAR *var = &ib_query->in_sqlda->sqlvar[i];
 
 		// We need keep track of original type because XSQLVAR type could get modified
 		var->sqltype = ib_query->sql_types[i];
 
-		var->sqlind = &buf[i].nullind;
-		var->sqldata = (void*)&buf[i].val;
+		var->sqlind = &ib_query->bind_buf[i].nullind;
+		var->sqldata = (void*)&ib_query->bind_buf[i].val;
 
 		/* check if a NULL should be inserted */
 		switch (Z_TYPE_P(b_var)) {
@@ -613,7 +612,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 				if (! force_null) break;
 
 			case IS_NULL:
-					buf[i].nullind = -1;
+					*var->sqlind = -1;
 
 				if (var->sqltype & SQL_ARRAY) ++array_cnt;
 
@@ -622,7 +621,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 
 		/* if we make it to this point, we must provide a value for the parameter */
 
-		buf[i].nullind = 0;
+		*var->sqlind = 0;
 
 		switch (var->sqltype & ~1) {
 			struct tm t;
@@ -663,14 +662,14 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 
 				switch (var->sqltype & ~1) {
 					default: /* == case SQL_TIMESTAMP */
-						isc_encode_timestamp(&t, &buf[i].val.tsval);
+						isc_encode_timestamp(&t, &ib_query->bind_buf[i].val.tsval);
 						break;
 					case SQL_TYPE_DATE:
-						isc_encode_sql_date(&t, &buf[i].val.dtval);
+						isc_encode_sql_date(&t, &ib_query->bind_buf[i].val.dtval);
 						break;
 					case SQL_TYPE_TIME:
 					// TODO: case SQL_TIME_TZ:
-						isc_encode_sql_time(&t, &buf[i].val.tmval);
+						isc_encode_sql_time(&t, &ib_query->bind_buf[i].val.tmval);
 						break;
 				}
 				continue;
@@ -680,7 +679,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 				convert_to_string(b_var);
 
 				if (Z_STRLEN_P(b_var) != BLOB_ID_LEN ||
-					!_php_ibase_string_to_quad(Z_STRVAL_P(b_var), &buf[i].val.qval)) {
+					!_php_ibase_string_to_quad(Z_STRVAL_P(b_var), &ib_query->bind_buf[i].val.qval)) {
 
 					ibase_blob ib_blob = { 0 };
 					ib_blob.type = BLOB_INPUT;
@@ -699,7 +698,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 						_php_ibase_error();
 						return FAILURE;
 					}
-					buf[i].val.qval = ib_blob.bl_qd;
+					ib_query->bind_buf[i].val.qval = ib_blob.bl_qd;
 				}
 				continue;
 #ifdef SQL_BOOLEAN
@@ -743,7 +742,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 						break;
 					}
 					case IS_NULL:
-						buf[i].nullind = -1;
+						*var->sqlind = -1;
 						break;
 					default:
 						_php_ibase_module_error("Parameter %d: must be boolean", i+1);
@@ -759,7 +758,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 					convert_to_string(b_var);
 
 					if (Z_STRLEN_P(b_var) != BLOB_ID_LEN ||
-						!_php_ibase_string_to_quad(Z_STRVAL_P(b_var), &buf[i].val.qval)) {
+						!_php_ibase_string_to_quad(Z_STRVAL_P(b_var), &ib_query->bind_buf[i].val.qval)) {
 
 						_php_ibase_module_error("Parameter %d: invalid array ID",i+1);
 						rv = FAILURE;
@@ -784,7 +783,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 						efree(array_data);
 						return FAILURE;
 					}
-					buf[i].val.qval = array_id;
+					ib_query->bind_buf[i].val.qval = array_id;
 					efree(array_data);
 				}
 				++array_cnt;
@@ -796,6 +795,12 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 		var->sqldata = Z_STRVAL_P(b_var);
 		var->sqllen = (ISC_SHORT)Z_STRLEN_P(b_var);
 		var->sqltype = SQL_TEXT; // Here: sqltype is modfied, can't rely on it for next calls
+
+		// Another way to send string w/o converting base zval
+		// zend_string *str = zval_get_string(b_var);
+		// var->sqldata = ZSTR_VAL(str);
+		// var->sqllen = (ISC_SHORT)ZSTR_LEN(str);
+		// zend_string_release(str);
 	} /* for */
 	return rv;
 }
