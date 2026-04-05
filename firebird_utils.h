@@ -17,6 +17,10 @@
 #ifndef PDO_FIREBIRD_UTILS_H
 #define PDO_FIREBIRD_UTILS_H
 
+#define STRNUM_PARSE_OK       0
+#define STRNUM_PARSE_ERROR    1
+#define STRNUM_PARSE_OVERFLOW 2
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -47,6 +51,8 @@ int fbu_insert_field_info(void *master_ptr, ISC_STATUS* st, int is_outvar, int n
 int fbu_insert_aliases(void *master_ptr, ISC_STATUS* st, ibase_query *ib_query,
   void *statement_ptr);
 void fbu_release_statement(void *statement_ptr);
+int fbu_string_to_numeric(const char *s, size_t slen, int scale, uint64_t max,
+    int *sign, int *exp, uint64_t *res);
 
 #endif // FB_API_VER >= 30
 
