@@ -2,14 +2,14 @@
 InterBase: transactions
 --SKIPIF--
 <?php
-include("skipif.inc");
+include(__DIR__."/skipif.inc");
 ?>
 --FILE--
 <?php
 
 // See https://github.com/FirebirdSQL/php-firebird/issues/41
 
-    require("interbase.inc");
+    require(__DIR__."/interbase.inc");
 
     ibase_connect($test_base);
 
@@ -207,7 +207,10 @@ transactions on second link
     ibase_free_result($res);
 
     ibase_close($link_1);
-    ibase_close($link_2);
+    // As of 6.1.1-RC3 ibase_close() really closes the connection. It does not
+    // create a new connection with same args though hence $link_1 === $link_2
+    // and the connection is already closed by now
+    // ibase_close($link_2);
 
     echo "end of test\n";
 ?>
