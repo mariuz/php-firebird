@@ -351,6 +351,7 @@ _php_ibase_alloc_query_error:
 }
 /* }}} */
 
+// TODO: array handling is broken
 static int _php_ibase_bind_array(zval *val, char *buf, zend_ulong buf_size, /* {{{ */
 	ibase_array *array, int dim)
 {
@@ -584,8 +585,10 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 		var->sqltype = ib_query->sql_types[i];
 		var->sqllen = ib_query->sql_lens[i];
 
-		var->sqlind = &ib_query->bind_buf[i].nullind;
-		var->sqldata = (void*)&ib_query->bind_buf[i].val;
+		BIND_BUF *buf = &ib_query->bind_buf[i];
+		var->sqlind = &buf->nullind;
+		var->sqldata = (void*)&buf->val;
+		ISC_SHORT sqltype = var->sqltype & ~1;
 
 		/* check if a NULL should be inserted */
 		switch (Z_TYPE_P(b_var)) {
@@ -596,7 +599,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 				force_null = 0;
 
 				/* for these types, an empty string can be handled like a NULL value */
-				switch (var->sqltype & ~1) {
+				switch (sqltype) {
 					case SQL_SHORT:
 					case SQL_LONG:
 					case SQL_INT64:
@@ -685,7 +688,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 				convert_to_string(b_var);
 
 				if (Z_STRLEN_P(b_var) != BLOB_ID_LEN ||
-					!_php_ibase_string_to_quad(Z_STRVAL_P(b_var), &ib_query->bind_buf[i].val.qval)) {
+					!_php_ibase_string_to_quad(Z_STRVAL_P(b_var), &buf->val.qval)) {
 
 					ibase_blob ib_blob = { 0 };
 					ib_blob.type = BLOB_INPUT;
@@ -704,7 +707,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 						_php_ibase_error();
 						return FAILURE;
 					}
-					ib_query->bind_buf[i].val.qval = ib_blob.bl_qd;
+					buf->val.qval = ib_blob.bl_qd;
 				}
 				continue;
 #ifdef SQL_BOOLEAN
@@ -715,7 +718,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 					case IS_DOUBLE:
 					case IS_TRUE:
 					case IS_FALSE:
-						*(FB_BOOLEAN *)var->sqldata = zend_is_true(b_var) ? FB_TRUE : FB_FALSE;
+						buf->val.bval = zend_is_true(b_var) ? FB_TRUE : FB_FALSE;
 						break;
 					case IS_STRING:
 					{
@@ -723,22 +726,22 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 						double dval;
 
 						if ((Z_STRLEN_P(b_var) == 0)) {
-							*(FB_BOOLEAN *)var->sqldata = FB_FALSE;
+							buf->val.bval = FB_FALSE;
 							break;
 						}
 
 						switch (is_numeric_string(Z_STRVAL_P(b_var), Z_STRLEN_P(b_var), &lval, &dval, 0)) {
 							case IS_LONG:
-								*(FB_BOOLEAN *)var->sqldata = (lval != 0) ? FB_TRUE : FB_FALSE;
+								buf->val.bval = (lval != 0) ? FB_TRUE : FB_FALSE;
 								break;
 							case IS_DOUBLE:
-								*(FB_BOOLEAN *)var->sqldata = (dval != 0) ? FB_TRUE : FB_FALSE;
+								buf->val.bval = (dval != 0) ? FB_TRUE : FB_FALSE;
 								break;
 							default:
 								if (!zend_binary_strncasecmp(Z_STRVAL_P(b_var), Z_STRLEN_P(b_var), "true", 4, 4)) {
-									*(FB_BOOLEAN *)var->sqldata = FB_TRUE;
+									buf->val.bval = FB_TRUE;
 								} else if (!zend_binary_strncasecmp(Z_STRVAL_P(b_var), Z_STRLEN_P(b_var), "false", 5, 5)) {
-									*(FB_BOOLEAN *)var->sqldata = FB_FALSE;
+									buf->val.bval = FB_FALSE;
 								} else {
 									_php_ibase_module_error("Parameter %d: cannot convert string to boolean", i+1);
 									rv = FAILURE;
@@ -747,9 +750,6 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 						}
 						break;
 					}
-					case IS_NULL:
-						*var->sqlind = -1;
-						break;
 					default:
 						_php_ibase_module_error("Parameter %d: must be boolean", i+1);
 						rv = FAILURE;
@@ -764,7 +764,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 					convert_to_string(b_var);
 
 					if (Z_STRLEN_P(b_var) != BLOB_ID_LEN ||
-						!_php_ibase_string_to_quad(Z_STRVAL_P(b_var), &ib_query->bind_buf[i].val.qval)) {
+						!_php_ibase_string_to_quad(Z_STRVAL_P(b_var), &buf->val.qval)) {
 
 						_php_ibase_module_error("Parameter %d: invalid array ID",i+1);
 						rv = FAILURE;
@@ -789,7 +789,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 						efree(array_data);
 						return FAILURE;
 					}
-					ib_query->bind_buf[i].val.qval = array_id;
+					buf->val.qval = array_id;
 					efree(array_data);
 				}
 				++array_cnt;
@@ -814,9 +814,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 
 static void _php_ibase_alloc_xsqlda_vars(XSQLDA *sqlda, ISC_SHORT *nullinds) /* {{{ */
 {
-	int i;
-
-	for (i = 0; i < sqlda->sqld; i++) {
+	for (int i = 0; i < sqlda->sqld; i++) {
 		XSQLVAR *var = &sqlda->sqlvar[i];
 
 		// Convert CHAR to VARCHAR to avoid dealiong with padding with
@@ -839,14 +837,14 @@ static void _php_ibase_alloc_xsqlda_vars(XSQLDA *sqlda, ISC_SHORT *nullinds) /* 
 				break;
 #endif
 			case SQL_SHORT:
-				var->sqldata = emalloc(sizeof(short));
+				var->sqldata = emalloc(sizeof(ISC_SHORT));
 				break;
 			case SQL_LONG:
 				var->sqldata = emalloc(sizeof(ISC_LONG));
 				break;
 			case SQL_FLOAT:
 				var->sqldata = emalloc(sizeof(float));
-					break;
+				break;
 			case SQL_DOUBLE:
 				var->sqldata = emalloc(sizeof(double));
 				break;
@@ -864,6 +862,7 @@ static void _php_ibase_alloc_xsqlda_vars(XSQLDA *sqlda, ISC_SHORT *nullinds) /* 
 				break;
 			case SQL_BLOB:
 			case SQL_ARRAY:
+			case SQL_QUAD:
 				var->sqldata = emalloc(sizeof(ISC_QUAD));
 				break;
 #if FB_API_VER >= 40
@@ -879,7 +878,7 @@ static void _php_ibase_alloc_xsqlda_vars(XSQLDA *sqlda, ISC_SHORT *nullinds) /* 
 				break;
 #endif
 			default:
-				fbp_fatal("Unhandled sqltype: %d for sqlname %s %s:%d. Probably compiled against outdated fbclient library (%d)", var->sqltype, var->sqlname, __FILE__, __LINE__, FB_API_VER);
+				fbp_fatal("Unknown sqltype: %d for field %s %s:%d. Probably compiled against outdated fbclient library (%d)", var->sqltype, var->sqlname, __FILE__, __LINE__, FB_API_VER);
 				break;
 		} /* switch */
 
