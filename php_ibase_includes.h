@@ -139,13 +139,17 @@ typedef struct {
 #ifdef SQL_BOOLEAN
 		FB_BOOLEAN bval;
 #endif
-		short sval;
 		float fval;
-		ISC_LONG lval;
+		double dval;
+		ISC_INT64 lval;
 		ISC_QUAD qval;
 		ISC_TIMESTAMP tsval;
 		ISC_DATE dtval;
 		ISC_TIME tmval;
+#if FB_API_VER >= 40
+		ISC_TIME_TZ tmval_tz;
+		ISC_TIMESTAMP_TZ tsval_tz;
+#endif
 	} val;
 	short nullind;
 } BIND_BUF;
