@@ -7,6 +7,7 @@ InterBase: array handling
 
 	require("interbase.inc");
 
+	/** @var string $test_base */
 	ibase_connect($test_base);
 
 	ibase_query(
@@ -25,8 +26,7 @@ InterBase: array handling
 			)");
 	ibase_commit();
 
-	/* if timefmt not supported, hide error */
-	ini_set('ibase.timestampformat',"%m/%d/%Y %H:%M:%S");
+	ini_set('ibase.timestampformat',"m/d/Y H:i:s");
         
         /* To prevent unwanted roundings set PHP precision to 18 */
         ini_set('precision',"18");

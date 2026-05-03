@@ -7,6 +7,7 @@ InterBase: binding (may take a while)
 
 	require("interbase.inc");
 
+	/** @var string $test_base */
 	ibase_connect($test_base);
 
 	ibase_query(
@@ -31,8 +32,7 @@ InterBase: binding (may take a while)
 		end");
 	ibase_commit();
 
-	/* if timefmt not supported, hide error */
-	ini_set('ibase.timestampformat',"%m/%d/%Y %H:%M:%S");
+	ini_set('ibase.timestampformat',"m/d/Y H:i:s");
 
 	echo "insert\n";
 

@@ -6,6 +6,7 @@ InterBase: misc sql types (may take a while)
 <?php
 
     require("interbase.inc");
+    /** @var string $test_base */
     ibase_connect($test_base);
 
     /* To prevent unwanted roundings set PHP precision to 18 */
@@ -16,8 +17,8 @@ InterBase: misc sql types (may take a while)
         echo "PHP precision check fail\n";
         echo "Precision set in php.ini: " . ini_get('precision') . "\n";
         echo "Precision required: 18\n";
-    } 
-    
+    }
+
     ibase_query(
     	"create table test3 (
             iter		integer not null,
@@ -41,8 +42,7 @@ InterBase: misc sql types (may take a while)
 	/* should fail, but gracefully */
 	@ibase_query("insert into test3 (iter) values (?)", null);
 
-    /* if timefmt is not supported, suppress error here */
-    ini_set('ibase.timestampformat',"%m/%d/%Y %H:%M:%S");
+    ini_set("ibase.timestampformat", "m/d/Y H:i:s");
 
     for($iter = 0; $iter < 10; $iter++){
     	/* prepare data  */
@@ -65,7 +65,7 @@ InterBase: misc sql types (may take a while)
     	"insert into test3 (iter, v_char,v_date,v_decimal4_2, v_decimal4_0, v_decimal7_2, v_decimal7_0,v_numeric15_15, v_decimal18_3, v_numeric15_0,v_double,v_float,v_integer,v_smallint,v_varchar)
     	values ($iter, '$v_char','$v_date',$v_decimal4_2, $v_decimal4_0, $v_decimal7_2, $v_decimal7_0,$v_numeric15_15, $v_decimal18_3, $v_numeric15_0,$v_double,$v_float,$v_integer,$v_smallint,'$v_varchar')");
     	$sel = ibase_query("select * from test3 where iter = $iter");
-    	$row = ibase_fetch_object($sel);
+    	$row = ibase_fetch_object($sel) or die ("ibase_fetch_object failed");
     	if(substr($row->V_CHAR,0,strlen($v_char)) != $v_char){
         	echo " CHAR fail:\n";
             echo " in:  $v_char\n";
