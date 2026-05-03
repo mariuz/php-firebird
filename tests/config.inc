@@ -1,5 +1,7 @@
 <?php
 
+srand(((int)(float)microtime()*1000000));
+
 $user = 'SYSDBA';
 $password = 'masterkey';
 $host = "";

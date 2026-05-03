@@ -1,7 +1,5 @@
 <?php
 
-srand(((int)(float)microtime()*1000000));
-
 function out_table($table_name)
 {
 	echo "--- $table_name ---\n";
