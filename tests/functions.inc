@@ -98,6 +98,7 @@ function dump_rows($q, int $flags = 0) {
 }
 
 function dump_table_rows($table, $tr = null, int $flags = 0) {
+    $args = [];
     if($tr)$args[] = $tr;
     $args[] = sprintf('SELECT * FROM "%s"', $table);
 
@@ -105,6 +106,7 @@ function dump_table_rows($table, $tr = null, int $flags = 0) {
 }
 
 function insert_into($table, $data, $tr = null) {
+    $args = [];
     if($tr) $args[] = $tr;
     [$fields_str, $q_str] = array2sql_parts($data);
     $args[] = sprintf('INSERT INTO "%s" (%s) VALUES (%s)',

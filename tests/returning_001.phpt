@@ -8,6 +8,8 @@ include("skipif.inc");
 <?php
 
 require("interbase.inc");
+
+/** @var string $test_base */
 ibase_connect($test_base);
 
 (function(){
@@ -19,7 +21,7 @@ ibase_connect($test_base);
 
     print "--------\n";
 
-    $q = ibase_query("UPDATE TEST1 SET I = I + 1, C = C || ' updated' RETURNING OLD.I AS OLD_I, OLD.C AS OLD_C, NEW.I AS NEW_I, NEW.C AS NEW_C");
+    $q = ibase_query("UPDATE TEST1 SET I = I + 1, C = C || ' updated' RETURNING OLD.I, OLD.C, NEW.I, NEW.C");
     dump_rows($q);
     dump_table_rows("TEST1");
 })();
@@ -40,13 +42,13 @@ array(2) {
 }
 --------
 array(4) {
-  ["OLD_I"]=>
+  ["I"]=>
   int(1)
-  ["OLD_C"]=>
+  ["C"]=>
   string(6) "data 1"
-  ["NEW_I"]=>
+  ["I_01"]=>
   int(2)
-  ["NEW_C"]=>
+  ["C_01"]=>
   string(14) "data 1 updated"
 }
 array(2) {

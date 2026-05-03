@@ -4,11 +4,14 @@ ibase_field_info(): fields introduced in FB 3.0
 <?php
 include("skipif.inc");
 skip_if_fb_lt(3);
+skip_if_fbclient_lt(3);
 ?>
 --FILE--
 <?php
 
 require("interbase.inc");
+
+/** @var string $test_base */
 ibase_connect($test_base);
 
 (function(){
