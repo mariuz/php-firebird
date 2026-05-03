@@ -96,6 +96,7 @@ static void _php_ibase_free_query(ibase_query *ib_query) /* {{{ */
 	if(ib_query->ht_aliases)zend_array_destroy(ib_query->ht_aliases);
 	if(ib_query->ht_ind)zend_array_destroy(ib_query->ht_ind);
 	if(ib_query->sql_types)efree(ib_query->sql_types);
+	if(ib_query->sql_lens)efree(ib_query->sql_lens);
 
 	efree(ib_query);
 }
@@ -315,16 +316,18 @@ static int _php_ibase_prepare(ibase_query **new_query, ibase_db_link *link, /* {
 		ib_query->in_sqlda->sqln = ib_query->in_fields_count;
 		ib_query->in_sqlda->version = SQLDA_CURRENT_VERSION;
 
-		ib_query->sql_types = emalloc(sizeof(*ib_query->sql_types) * ib_query->in_fields_count);
-
 		if (isc_dsql_describe_bind(IB_STATUS, &ib_query->stmt, SQLDA_CURRENT_VERSION, ib_query->in_sqlda)) {
 			IBDEBUG("isc_dsql_describe_bind() failed\n");
 			_php_ibase_error();
 			goto _php_ibase_alloc_query_error;
 		}
 
+		ib_query->sql_types = emalloc(sizeof(*ib_query->sql_types) * ib_query->in_fields_count);
+		ib_query->sql_lens = emalloc(sizeof(*ib_query->sql_lens) * ib_query->in_fields_count);
+
 		for (int i = 0; i < ib_query->in_fields_count; i++) {
 			ib_query->sql_types[i] = ib_query->in_sqlda->sqlvar[i].sqltype;
+			ib_query->sql_lens[i] = ib_query->in_sqlda->sqlvar[i].sqllen;
 		}
 
 		assert(ib_query->in_sqlda->sqln == ib_query->in_sqlda->sqld);
@@ -579,6 +582,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 
 		// We need keep track of original type because XSQLVAR type could get modified
 		var->sqltype = ib_query->sql_types[i];
+		var->sqllen = ib_query->sql_lens[i];
 
 		var->sqlind = &ib_query->bind_buf[i].nullind;
 		var->sqldata = (void*)&ib_query->bind_buf[i].val;
