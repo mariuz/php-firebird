@@ -15,14 +15,18 @@
   +----------------------------------------------------------------------+
 */
 
+extern "C" {
 #include <ibase.h>
+#include "php.h"
+#include "firebird_utils.h"
+#include "php_ibase_includes.h"
+#include "ext/date/php_date.h"
+#include "zend_interfaces.h"
+}
 
 #if FB_API_VER >= 30
 #include <firebird/Interface.h>
 #include <cstring>
-#include "php.h"
-#include "firebird_utils.h"
-#include "php_ibase_includes.h"
 
 /* Returns the client version. 0 bytes are minor version, 1 bytes are major version. */
 extern "C" unsigned fbu_get_client_version(void *master_ptr)
