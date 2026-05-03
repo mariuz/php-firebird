@@ -178,14 +178,9 @@ typedef struct _ib_query {
 	int was_result_once;
 } ibase_query;
 
-enum php_interbase_option {
+/* transaction access mode */
+enum php_interbase_trans_option {
 	PHP_IBASE_DEFAULT            = 0,
-	PHP_IBASE_CREATE             = 0,
-	/* fetch flags */
-	PHP_IBASE_FETCH_BLOBS        = 1,
-	PHP_IBASE_FETCH_ARRAYS       = 2,
-	PHP_IBASE_UNIXTIME           = 4,
-	/* transaction access mode */
 	PHP_IBASE_WRITE              = 1,
 	PHP_IBASE_READ               = 2,
 	/* transaction isolation level */
@@ -198,6 +193,18 @@ enum php_interbase_option {
 	PHP_IBASE_WAIT               = 128,
 	PHP_IBASE_NOWAIT             = 256,
 		PHP_IBASE_LOCK_TIMEOUT   = 512,
+};
+
+/* fetch flags */
+enum php_interbase_fetch_option {
+	PHP_IBASE_FETCH_BLOBS        = 1,
+	PHP_IBASE_FETCH_ARRAYS       = 2,
+	PHP_IBASE_UNIXTIME           = 4,
+	PHP_IBASE_PHPDATE            = 8,
+};
+
+enum php_interbase_query_option {
+	PHP_IBASE_CREATE = 0,
 };
 
 #define IBG(v) ZEND_MODULE_GLOBALS_ACCESSOR(ibase, v)
