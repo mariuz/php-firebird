@@ -1,13 +1,12 @@
 --TEST--
 InterBase: binding (may take a while)
 --SKIPIF--
-<?php include("skipif.inc"); ?>
+<?php include(__DIR__."/skipif.inc"); ?>
 --FILE--
 <?php
 
-	require("interbase.inc");
+	require(__DIR__."/interbase.inc");
 
-	/** @var string $test_base */
 	ibase_connect($test_base);
 
 	ibase_query(
@@ -218,15 +217,12 @@ InterBase: binding (may take a while)
 
 	/* test execute procedure */
 	$query = ibase_prepare("execute procedure add1(?)");
-	$res = array();
 	for ($i = 0; $i < 10; $i++) {
-		$res[] = ibase_execute($query,$i);
+		$res = ibase_execute($query,$i);
+		out_result($res, "proc add1");
+		ibase_free_result($res);
 	}
 	ibase_free_query($query);
-	foreach ($res as $r) {
-		out_result($r, "proc add1");
-		ibase_free_result($r);
-	}
 
 	ibase_close();
 	echo "end of test\n";
