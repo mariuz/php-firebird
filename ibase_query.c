@@ -28,6 +28,8 @@
 // #pragma GCC diagnostic error "-Wall"
 // #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 
+// TODO: SQL_TIME_TZ_EX, SQL_TIMESTAMP_TZ_EX
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -38,6 +40,8 @@
 #if HAVE_IBASE
 
 #include "ext/standard/php_standard.h"
+#include "ext/date/php_date.h"
+#include "zend_interfaces.h"
 #include "php_interbase.h"
 #include "php_ibase_includes.h"
 #include "firebird_utils.h"
@@ -571,9 +575,10 @@ static int _php_ibase_bind_array(zval *val, char *buf, zend_ulong buf_size, /* {
 
 static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 {
-	// BIND_BUF *buf = ib_query->bind_buf;
-	// XSQLDA *sqlda = ib_query->in_sqlda;
-	int i, array_cnt = 0, rv = SUCCESS;
+	int i, array_cnt = 0;
+	zend_long long_val;
+	struct tm t;
+	const char *tformat = NULL;
 
 	assert(ib_query->in_fields_count > 0);
 
@@ -632,59 +637,143 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 
 		*var->sqlind = 0;
 
-		switch (var->sqltype & ~1) {
-			struct tm t;
-
-			case SQL_TIMESTAMP:
-			// TODO: case SQL_TIMESTAMP_TZ:
-			// TODO: case SQL_TIME_TZ:
+		// Type checks and conversations
+		switch (sqltype)
+		{
+			case SQL_FLOAT:
+			case SQL_DOUBLE:
+				switch (Z_TYPE_P(b_var))
+				{
+					case IS_DOUBLE: break;
+					case IS_STRING:
+					case IS_LONG:
+						convert_to_double(b_var);
+						break;
+					default:
+						goto cast_to_string;
+				}
+				break;
 			case SQL_TYPE_DATE:
-			case SQL_TYPE_TIME:
-				if (Z_TYPE_P(b_var) == IS_LONG) {
-					struct tm *res;
-					res = php_gmtime_r(&Z_LVAL_P(b_var), &t);
-					if (!res) {
-						return FAILURE;
-					}
-				} else {
-#ifdef HAVE_STRPTIME
-					char *format = INI_STR("ibase.timestampformat");
-
-					convert_to_string(b_var);
-
-					switch (var->sqltype & ~1) {
-						case SQL_TYPE_DATE:
-							format = INI_STR("ibase.dateformat");
-							break;
-						case SQL_TYPE_TIME:
-						// TODO: case SQL_TIME_TZ:
-							format = INI_STR("ibase.timeformat");
-					}
-					if (!strptime(Z_STRVAL_P(b_var), format, &t)) {
-						/* strptime() cannot handle it, so let IB have a try */
-						break;
-					}
-#else /* ifndef HAVE_STRPTIME */
-					break; /* let IB parse it as a string */
+			case SQL_TIMESTAMP:
+#if FB_API_VER >= 40
+			case SQL_TIMESTAMP_TZ:
 #endif
+				switch (Z_TYPE_P(b_var))
+				{
+					case IS_LONG:
+						if (!php_gmtime_r(&Z_LVAL_P(b_var), &t)) {
+							fbp_fatal("Argument %d: could not parse timestamp", i);
+						}
+						break;
+					default:
+						goto cast_to_string;
 				}
-
-				switch (var->sqltype & ~1) {
-					default: /* == case SQL_TIMESTAMP */
-						isc_encode_timestamp(&t, &ib_query->bind_buf[i].val.tsval);
+				break;
+			case SQL_TYPE_TIME:
+#if FB_API_VER >= 40
+			case SQL_TIME_TZ:
+#endif
+				// TODO: long sec?
+				goto cast_to_string;
+#if FB_API_VER >= 40
+			case SQL_DEC16:
+			case SQL_DEC34:
+			case SQL_INT128:
+				goto cast_to_string;
+#endif
+			case SQL_SHORT:
+			case SQL_LONG:
+			case SQL_INT64:
+				switch (Z_TYPE_P(b_var))
+				{
+					case IS_LONG:
+						long_val = Z_LVAL_P(b_var);
 						break;
-					case SQL_TYPE_DATE:
-						isc_encode_sql_date(&t, &ib_query->bind_buf[i].val.dtval);
+					case IS_TRUE:
+						long_val = 1;
 						break;
-					case SQL_TYPE_TIME:
-					// TODO: case SQL_TIME_TZ:
-						isc_encode_sql_time(&t, &ib_query->bind_buf[i].val.tmval);
+					case IS_FALSE:
+						long_val = 0;
 						break;
+					default:
+						goto cast_to_string;
 				}
-				continue;
+				break;
+		}
 
+		// Setting the data
+		switch (sqltype)
+		{
+			case SQL_SHORT:
+				buf->val.lval = (ISC_SHORT)long_val;
+				break;
+			case SQL_LONG:
+				buf->val.lval = (ISC_LONG)long_val;
+				break;
+			case SQL_INT64:
+				buf->val.lval = (ISC_INT64)long_val;
+				break;
+			case SQL_FLOAT:
+				buf->val.fval = (float)Z_DVAL_P(b_var);
+				break;
+			case SQL_DOUBLE:
+				buf->val.dval = (double)Z_DVAL_P(b_var);
+				break;
+			case SQL_TYPE_DATE:
+				switch (Z_TYPE_P(b_var))
+				{
+					case IS_LONG:
+						isc_encode_sql_date(&t, &buf->val.dtval);
+						break;
+					case IS_STRING:
+						tformat = INI_STR("ibase.dateformat");
+						goto parse_datetime;
+					default:
+						fbp_fatal("BUG: unreachable");
+				}
+				break;
+			case SQL_TIMESTAMP:
+				switch (Z_TYPE_P(b_var))
+				{
+					case IS_LONG:
+					{
+						ISC_TIMESTAMP *ts = &buf->val.tsval;
+						isc_encode_sql_date(&t, &ts->timestamp_date);
+						isc_encode_sql_time(&t, &ts->timestamp_time);
+					} break;
+					case IS_STRING:
+						tformat = INI_STR("ibase.timestampformat");
+						goto parse_datetime;
+					default:
+						fbp_fatal("BUG: unreachable");
+				}
+				break;
+			case SQL_TYPE_TIME:
+				tformat = INI_STR("ibase.timeformat");
+				goto parse_datetime;
+#if FB_API_VER >= 40
+			case SQL_TIMESTAMP_TZ:
+				switch (Z_TYPE_P(b_var))
+				{
+					case IS_LONG:
+					{
+						ISC_TIMESTAMP_TZ *ts = &buf->val.tsval_tz;
+						isc_encode_sql_date(&t, &ts->utc_timestamp.timestamp_date);
+						isc_encode_sql_time(&t, &ts->utc_timestamp.timestamp_time);
+						ts->time_zone = 0;
+					} break;
+					case IS_STRING:
+						tformat = INI_STR("ibase.timestampformat_tz");
+						goto parse_datetime;
+					default:
+						fbp_fatal("BUG: unreachable");
+				}
+				break;
+			case SQL_TIME_TZ:
+				tformat = INI_STR("ibase.timeformat_tz");
+				goto parse_datetime;
+#endif
 			case SQL_BLOB:
-
 				convert_to_string(b_var);
 
 				if (Z_STRLEN_P(b_var) != BLOB_ID_LEN ||
@@ -709,10 +798,9 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 					}
 					buf->val.qval = ib_blob.bl_qd;
 				}
-				continue;
+			break;
 #ifdef SQL_BOOLEAN
 			case SQL_BOOLEAN:
-
 				switch (Z_TYPE_P(b_var)) {
 					case IS_LONG:
 					case IS_DOUBLE:
@@ -743,23 +831,17 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 								} else if (!zend_binary_strncasecmp(Z_STRVAL_P(b_var), Z_STRLEN_P(b_var), "false", 5, 5)) {
 									buf->val.bval = FB_FALSE;
 								} else {
-									_php_ibase_module_error("Parameter %d: cannot convert string to boolean", i+1);
-									rv = FAILURE;
-									continue;
+									fbp_fatal("Parameter %d: cannot convert string to boolean", i+1);
 								}
 						}
 						break;
 					}
 					default:
-						_php_ibase_module_error("Parameter %d: must be boolean", i+1);
-						rv = FAILURE;
-						continue;
+						fbp_fatal("Parameter %d: must be boolean", i+1);
 				}
-				// var->sqltype = SQL_BOOLEAN;
-				continue;
+				break;
 #endif
 			case SQL_ARRAY:
-
 				if (Z_TYPE_P(b_var) != IS_ARRAY) {
 					convert_to_string(b_var);
 
@@ -767,7 +849,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 						!_php_ibase_string_to_quad(Z_STRVAL_P(b_var), &buf->val.qval)) {
 
 						_php_ibase_module_error("Parameter %d: invalid array ID",i+1);
-						rv = FAILURE;
+						// rv = FAILURE;
 					}
 				} else {
 					/* convert the array data into something IB can understand */
@@ -779,7 +861,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 							ar, 0)) {
 						_php_ibase_module_error("Parameter %d: failed to bind array argument", i+1);
 						efree(array_data);
-						rv = FAILURE;
+						// rv = FAILURE;
 						continue;
 					}
 
@@ -793,22 +875,69 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 					efree(array_data);
 				}
 				++array_cnt;
-				continue;
+				break;
+			default:
+				fbp_warning("Unknown sqltype: %d %s:%d. Probably compiled against outdated fbclient library (%d)", sqltype, __FILE__, __LINE__, FB_API_VER);
+			case SQL_TEXT:
+			case SQL_VARYING:
+cast_to_string:
+				convert_to_string(b_var);
+				var->sqltype = SQL_TEXT | (var->sqltype & 1);
+				var->sqldata = Z_STRVAL_P(b_var);
+				var->sqllen = (ISC_SHORT)Z_STRLEN_P(b_var);
+				break;
 		} /* switch */
 
-		/* we end up here if none of the switch cases handled the field */
-		convert_to_string(b_var);
-		var->sqldata = Z_STRVAL_P(b_var);
-		var->sqllen = (ISC_SHORT)Z_STRLEN_P(b_var);
-		var->sqltype = SQL_TEXT; // Here: sqltype is modfied, can't rely on it for next calls
+		continue;
 
-		// Another way to send string w/o converting base zval
-		// zend_string *str = zval_get_string(b_var);
-		// var->sqldata = ZSTR_VAL(str);
-		// var->sqllen = (ISC_SHORT)ZSTR_LEN(str);
-		// zend_string_release(str);
+parse_datetime: {
+		zval dateo;
+		php_date_obj *obj;
+
+		php_date_instantiate(php_date_get_date_ce(), &dateo);
+		obj = Z_PHPDATE_P(&dateo);
+
+		// php_printf("  tformat: %s\n", tformat);
+		if (!php_date_initialize(obj, Z_STRVAL_P(b_var), Z_STRLEN_P(b_var), tformat, NULL, PHP_DATE_INIT_FORMAT)) {
+			zval_ptr_dtor(&dateo);
+
+			fbp_fatal("Argument %d: parse date failed, "
+				"call date_get_last_errors() for more information",
+				i
+			);
+		}
+
+		switch (sqltype) {
+			case SQL_TYPE_TIME:
+				buf->val.tmval = fbu_encode_time(IBG(master_instance), obj->time->h, obj->time->i, obj->time->s, obj->time->us);
+				break;
+			case SQL_TYPE_DATE:
+				buf->val.dtval = fbu_encode_date(IBG(master_instance), obj->time->y, obj->time->m, obj->time->d);
+				break;
+			case SQL_TIMESTAMP:
+				ISC_TIMESTAMP *ts = &buf->val.tsval;
+				ts->timestamp_date = fbu_encode_date(IBG(master_instance), obj->time->y, obj->time->m, obj->time->d);
+				ts->timestamp_time = fbu_encode_time(IBG(master_instance), obj->time->h, obj->time->i, obj->time->s, obj->time->us);
+				break;
+#if FB_API_VER >= 40
+			case SQL_TIME_TZ:
+				fbu_encode_time_tz(IBG(master_instance), &buf->val.tmval_tz, obj->time->h, obj->time->i, obj->time->s, obj->time->us, obj->time->tz_info->name);
+				break;
+			case SQL_TIMESTAMP_TZ:
+				fbu_encode_timestamp_tz(IBG(master_instance), &buf->val.tsval_tz,
+					obj->time->y, obj->time->m, obj->time->d,
+					obj->time->h, obj->time->i, obj->time->s, obj->time->us,
+					obj->time->tz_info->name
+				);
+				break;
+#endif
+			default: fbp_fatal("BUG: unreachable");
+		}
+		zval_ptr_dtor(&dateo);
+} // parse_datetime:
 	} /* for */
-	return rv;
+
+	return SUCCESS;
 }
 /* }}} */
 
@@ -879,7 +1008,6 @@ static void _php_ibase_alloc_xsqlda_vars(XSQLDA *sqlda, ISC_SHORT *nullinds) /* 
 #endif
 			default:
 				fbp_fatal("Unknown sqltype: %d for field %s %s:%d. Probably compiled against outdated fbclient library (%d)", var->sqltype, var->sqlname, __FILE__, __LINE__, FB_API_VER);
-				break;
 		} /* switch */
 
 		if (var->sqltype & 1) { /* sql NULL flag */
@@ -1257,12 +1385,17 @@ static int _php_ibase_var_zval(zval *val, void *data, int type, int len, /* {{{ 
 		LL_LIT(1000000000000000000)
 	};
 
-	switch (type & ~1) {
+	const char *t_format;
+	unsigned t_year, t_month, t_day, t_hours, t_minutes, t_seconds, t_fractions;
+	char t_zone_buff[40] = "UTC";
+	zval t_dateo;
+	php_date_obj *t_date_obj;
+	ISC_SHORT sqltype = type & ~1;
+
+	switch (sqltype) {
 		unsigned short l;
 		zend_long n;
 		char string_data[255];
-		struct tm t;
-		char *format;
 
 		case SQL_VARYING:
 			len = ((IBVARY *) data)->vary_length;
@@ -1321,85 +1454,107 @@ static int _php_ibase_var_zval(zval *val, void *data, int type, int len, /* {{{ 
 			}
 			break;
 		case SQL_FLOAT:
+			// Experiments with trimming
+			// https://firebirdsql.org/file/documentation/html/en/refdocs/fblangref50/firebird-50-language-reference.html#fblangref50-datatypes-floattypes
+			// The FLOAT data type defaults to a 32-bit single precision
+			// floating-point type with an approximate precision of 7 decimal
+			// digits after the decimal point (24 binary digits). To ensure the
+			// safety of storage, rely on 6 decimal digits of precision.
+			// char _fbfloat_buf[32] = {0};
+			// php_gcvt(*(float *) data, 7, '.', 'e', _fbfloat_buf);
+			// php_printf("float: %f, converted to: %s\n", *(float *) data, _fbfloat_buf);
+			// ZVAL_DOUBLE(val, zend_strtod(_fbfloat_buf, NULL));
 			ZVAL_DOUBLE(val, *(float *) data);
 			break;
 		case SQL_DOUBLE:
 			ZVAL_DOUBLE(val, *(double *) data);
 			break;
+		case SQL_TYPE_DATE: {
+			t_format = INI_STR("ibase.dateformat");
+			t_hours = t_minutes = t_seconds = t_fractions = 0;
+			fbu_decode_date(IBG(master_instance), *(ISC_DATE *)data, &t_year, &t_month, &t_day);
+			goto _set_datetime;
+		}
+		case SQL_TYPE_TIME:
+			t_format = INI_STR("ibase.timeformat");
+			t_year = t_month = t_day = 0;
+			fbu_decode_time(IBG(master_instance), *(ISC_TIME *)data, &t_hours, &t_minutes, &t_seconds, &t_fractions);
+			goto _set_datetime;
+		case SQL_TIMESTAMP: {
+			t_format = INI_STR("ibase.timestampformat");
+			ISC_TIMESTAMP *ts = (ISC_TIMESTAMP *) data;
+			fbu_decode_date(IBG(master_instance), ts->timestamp_date, &t_year, &t_month, &t_day);
+			fbu_decode_time(IBG(master_instance), ts->timestamp_time, &t_hours, &t_minutes, &t_seconds, &t_fractions);
+			// php_printf("ISC_TIMESTAMP: %zd, %zu\n", ts->timestamp_date, ts->timestamp_time);
+			goto _set_datetime;
+		}
+
 #if FB_API_VER >= 40
 		// These are converted to VARCHAR via isc_dpb_set_bind tag at connect
 		// case SQL_DEC16:
 		// case SQL_DEC34:
 		// case SQL_INT128:
 		case SQL_TIME_TZ:
+			t_format = INI_STR("ibase.timeformat_tz");
+			t_year = t_month = t_day = 0;
+			fbu_decode_time_tz(IBG(master_instance), (ISC_TIME_TZ *)data, &t_hours, &t_minutes, &t_seconds, &t_fractions, sizeof(t_zone_buff), t_zone_buff);
+			goto _set_datetime;
+
 		case SQL_TIMESTAMP_TZ:
-			// Should be converted to VARCHAR via isc_dpb_set_bind tag at
-			// connect if fbclient does not have fb_get_master_instance().
-			// Assert this just in case.
-			if(!IBG(master_instance)) {
-				assert(false && "UNREACHABLE");
-			}
+			t_format = INI_STR("ibase.timestampformat_tz");
+			fbu_decode_timestamp_tz(IBG(master_instance), (ISC_TIMESTAMP_TZ *)data, &t_year, &t_month, &t_day, &t_hours,
+				&t_minutes, &t_seconds, &t_fractions, sizeof(t_zone_buff), t_zone_buff);
+			goto _set_datetime;
+#endif
 
-			char timeZoneBuffer[40] = {0};
-			unsigned year, month, day, hours, minutes, seconds, fractions;
+_set_datetime:
+			fbu_init_date_object(t_zone_buff, &t_dateo);
+			t_date_obj = Z_PHPDATE_P(&t_dateo);
+			t_date_obj->time->y = t_year;
+			t_date_obj->time->m = t_month;
+			t_date_obj->time->d = t_day;
+			t_date_obj->time->h = t_hours;
+			t_date_obj->time->i = t_minutes;
+			t_date_obj->time->s = t_seconds;
+			t_date_obj->time->us = t_fractions;
+			t_date_obj->time->sse_uptodate = 0;
 
-			if((type & ~1) == SQL_TIME_TZ){
-				format = INI_STR("ibase.timeformat");
-				fbu_decode_time_tz(IBG(master_instance), (ISC_TIME_TZ *) data, &hours, &minutes, &seconds, &fractions, sizeof(timeZoneBuffer), timeZoneBuffer);
-				ISC_TIME time = fbu_encode_time(IBG(master_instance), hours, minutes, seconds, fractions);
-				isc_decode_sql_time(&time, &t);
+			if ((flag & PHP_IBASE_UNIXTIME) && (sqltype == SQL_TYPE_DATE || sqltype == SQL_TIMESTAMP
+#if FB_API_VER >= 40
+				|| sqltype == SQL_TIMESTAMP_TZ
+#endif
+			)) {
+				// ZVAL_LONG(val, mktime(&t));
+				zval retval;
+
+				#if PHP_MAJOR_VERSION >= 8
+					zend_call_method_with_0_params(Z_OBJ(t_dateo), php_date_get_date_ce(), NULL, "getTimestamp", &retval);
+				#else
+					zend_call_method_with_0_params(&t_dateo, NULL, NULL, "getTimestamp", &retval);
+				#endif
+
+				ZVAL_LONG(val, Z_LVAL(retval));
 			} else {
-				format = INI_STR("ibase.timestampformat");
-				fbu_decode_timestamp_tz(IBG(master_instance), (ISC_TIMESTAMP_TZ *) data, &year, &month, &day, &hours, &minutes, &seconds, &fractions, sizeof(timeZoneBuffer), timeZoneBuffer);
-				ISC_TIMESTAMP ts;
-				ts.timestamp_date = fbu_encode_date(IBG(master_instance), year, month, day);
-				ts.timestamp_time = fbu_encode_time(IBG(master_instance), hours, minutes, seconds, fractions);
-				isc_decode_timestamp(&ts, &t);
-			}
-
-			if (((type & ~1) != SQL_TIME_TZ) && (flag & PHP_IBASE_UNIXTIME)) {
-				ZVAL_LONG(val, mktime(&t));
-			} else {
-				char timeBuf[80] = {0};
-				l = strftime(timeBuf, sizeof(timeBuf), format, &t);
-				if (l == 0) {
-					return FAILURE;
+				if (flag & PHP_IBASE_PHPDATE) {
+					ZVAL_COPY(val, &t_dateo);
+				} else {
+					#if PHP_MAJOR_VERSION >= 8
+						ZVAL_STR(val, php_format_date_obj(t_format, strlen(t_format), t_date_obj));
+					#else
+						zval format_zval, retval;
+						ZVAL_STRING(&format_zval, t_format);
+						zend_call_method_with_1_params(&t_dateo, php_date_get_date_ce(), NULL, "format", &retval, &format_zval);
+						zval_ptr_dtor(&format_zval);
+						ZVAL_STR(val, Z_STR(retval));
+					#endif
 				}
-
-				size_t tz_len = sprintf(string_data, "%s %s", timeBuf, timeZoneBuffer);
-				ZVAL_STRINGL(val, string_data, tz_len);
 			}
+			zval_ptr_dtor(&t_dateo);
 			break;
-#endif
-		case SQL_TIMESTAMP:
-			format = INI_STR("ibase.timestampformat");
-			isc_decode_timestamp((ISC_TIMESTAMP *) data, &t);
-			goto format_date_time;
-		case SQL_TYPE_DATE:
-			format = INI_STR("ibase.dateformat");
-			isc_decode_sql_date((ISC_DATE *) data, &t);
-			goto format_date_time;
-		case SQL_TYPE_TIME:
-			format = INI_STR("ibase.timeformat");
-			isc_decode_sql_time((ISC_TIME *) data, &t);
 
-format_date_time:
-			/*
-			  XXX - Might have to remove this later - seems that isc_decode_date()
-			   always sets tm_isdst to 0, sometimes incorrectly (InterBase 6 bug?)
-			*/
-			t.tm_isdst = -1;
-#if HAVE_STRUCT_TM_TM_ZONE
-			t.tm_zone = tzname[0];
-#endif
-			if (((type & ~1) != SQL_TYPE_TIME) && (flag & PHP_IBASE_UNIXTIME)) {
-				ZVAL_LONG(val, mktime(&t));
-			} else {
-				l = strftime(string_data, sizeof(string_data), format, &t);
-				ZVAL_STRINGL(val, string_data, l);
-				break;
-			}
-	} /* switch (type) */
+		default:
+			fbp_fatal("Unknown sqltype: %d %s:%d. Probably compiled against outdated fbclient library (%d)", sqltype, __FILE__, __LINE__, FB_API_VER);
+	} /* switch (sqltype) */
 	return SUCCESS;
 }
 /* }}}	*/

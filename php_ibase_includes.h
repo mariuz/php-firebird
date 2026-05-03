@@ -64,8 +64,8 @@ extern int le_link, le_plink, le_trans;
 
 #define MAX_ERRMSG (1024*4)
 
-#define IB_DEF_DATE_FMT "%Y-%m-%d"
-#define IB_DEF_TIME_FMT "%H:%M:%S"
+#define IB_DEF_DATE_FMT "Y-m-d"
+#define IB_DEF_TIME_FMT "H:i:s"
 
 /* this value should never be > USHRT_MAX */
 #define IBASE_BLOB_SEG 4096
