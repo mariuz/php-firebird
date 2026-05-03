@@ -321,3 +321,95 @@ extern "C" int fbu_string_to_numeric(const char *s, size_t slen, int scale, uint
 
 	return STRNUM_PARSE_OK;
 }
+
+// +-----------+------------------------+---------------------+
+// | Precision | Data type              | Dialect 3           |
+// +-----------+------------------------+---------------------+
+// | 1 - 4     | NUMERIC                | SMALLINT            |
+// | 1 - 4     | DECIMAL                | INTEGER             |
+// | 5 - 9     | NUMERIC or DECIMAL     | INTEGER             |
+// | 10 - 18   | NUMERIC or DECIMAL     | BIGINT              |
+// | 19 - 38   | NUMERIC or DECIMAL     | INT128              |
+// +-----------+------------------------+---------------------+
+extern "C" const char* fbu_get_sql_type_name(XSQLVAR *var, char *buf, size_t buf_size)
+{
+	unsigned short precision = 0;
+
+	if (var->sqlscale < 0) {
+		switch (var->sqltype & ~1)
+		{
+			case SQL_SHORT  : precision = 4; break;
+			case SQL_LONG   : precision = 9; break;
+			case SQL_INT64  : precision = 18; break;
+#if FB_API_VER >= 40
+			case SQL_INT128 : precision = 38; break;
+#endif
+			default: fbp_fatal("BUG: unhandled type: %d with scale: %d", var->sqltype, var->sqlscale);
+		}
+
+		slprintf(buf, buf_size, "NUMERIC(%d,%d)", precision, -var->sqlscale);
+
+		return buf;
+	} else {
+		switch (var->sqltype & ~1)
+		{
+			case SQL_TEXT:            return "CHAR";
+			case SQL_VARYING:         return "VARCHAR";
+			case SQL_SHORT:           return "SMALLINT";
+			case SQL_LONG:            return "INTEGER";
+			case SQL_INT64:           return "BIGINT";
+			case SQL_FLOAT:           return "FLOAT";
+			case SQL_DOUBLE:          return "DOUBLE PRECISION";
+			case SQL_D_FLOAT:         return "D_FLOAT";
+			case SQL_TIMESTAMP:       return "TIMESTAMP";
+			case SQL_TYPE_DATE:       return "DATE";
+			case SQL_TYPE_TIME:       return "TIME";
+			case SQL_BLOB:            return "BLOB";
+			case SQL_ARRAY:           return "ARRAY";
+			case SQL_QUAD:            return "QUAD";
+			case SQL_NULL:            return "NULL";
+#if FB_API_VER >= 30
+			case SQL_BOOLEAN:         return "BOOLEAN";
+#endif
+#if FB_API_VER >= 40
+			case SQL_DEC16:           return "DECFLOAT(16)";
+			case SQL_DEC34:           return "DECFLOAT(34)";
+			case SQL_INT128:          return "INT128";
+			case SQL_TIMESTAMP_TZ:    return "TIMESTAMP WITH TIME ZONE";
+			case SQL_TIMESTAMP_TZ_EX: return "EXTENDED TIMESTAMP WITH TIME ZONE";
+			case SQL_TIME_TZ:         return "TIME WITH TIME ZONE";
+			case SQL_TIME_TZ_EX:      return "EXTENDED TIME WITH TIME ZONE";
+#endif
+			default:                  return "UNKNOWN";
+		}
+	}
+}
+
+extern "C" void fbu_init_date_object(const char *tzbuff, zval *o)
+{
+	zval tzo, tzo_arg;
+
+	php_date_instantiate(php_date_get_date_ce(), o);
+
+	if (tzbuff) {
+		ZVAL_STRING(&tzo_arg, tzbuff);
+
+		object_init_ex(&tzo, php_date_get_timezone_ce());
+		#if PHP_MAJOR_VERSION >= 8
+			zend_call_known_instance_method_with_1_params(
+				Z_OBJCE(tzo)->constructor, Z_OBJ(tzo), NULL, &tzo_arg);
+		#else
+			zend_call_method_with_1_params(&tzo, php_date_get_timezone_ce(), NULL, "__construct", NULL, &tzo_arg);
+		#endif
+
+		php_date_initialize(Z_PHPDATE_P(o), "", 0, NULL, &tzo, 0);
+		zval_ptr_dtor(&tzo_arg);
+		zval_ptr_dtor(&tzo);
+	} else {
+		php_date_initialize(Z_PHPDATE_P(o), "", 0, NULL, NULL, 0);
+	}
+
+	// zend_string *tt = php_format_date(ff, strlen(ff), ((ISC_TIME_TZ *)data)->utc_time, 0);
+	// php_date_time_set(&new_object, h, i, s, ms, return_value);
+	// php_date_initialize_from_ts_long(date_obj, 0, 0);
+}
