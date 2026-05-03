@@ -50,6 +50,66 @@ extern "C" ISC_DATE fbu_encode_date(void *master_ptr, unsigned year, unsigned mo
 	return util->encodeDate(year, month, day);
 }
 
+extern "C" void fbu_decode_time(void *master_ptr, ISC_TIME time, unsigned* hours, unsigned* minutes, unsigned* seconds, unsigned* fractions)
+{
+	Firebird::IMaster* master = (Firebird::IMaster*)master_ptr;
+	Firebird::IUtil* util = master->getUtilInterface();
+	util->decodeTime(time, hours, minutes, seconds, fractions);
+}
+
+extern "C" void fbu_decode_date(void *master_ptr, ISC_DATE date, unsigned* year, unsigned* month, unsigned* day)
+{
+	Firebird::IMaster* master = (Firebird::IMaster*)master_ptr;
+	Firebird::IUtil* util = master->getUtilInterface();
+	util->decodeDate(date, year, month, day);
+}
+
+#else
+
+extern "C" ISC_TIME fbu_encode_time(void *master_ptr, unsigned hours, unsigned minutes, unsigned seconds, unsigned fractions)
+{
+	struct tm t = {};
+	t.tm_hour = (int)hours;
+	t.tm_min  = (int)minutes;
+	t.tm_sec  = (int)seconds;
+	ISC_TIME result;
+	isc_encode_sql_time(&t, &result);
+	return result;
+}
+
+extern "C" ISC_DATE fbu_encode_date(void *master_ptr, unsigned year, unsigned month, unsigned day)
+{
+	struct tm t = {};
+	t.tm_year = (int)year - 1900;
+	t.tm_mon  = (int)month - 1;
+	t.tm_mday = (int)day;
+	ISC_DATE result;
+	isc_encode_sql_date(&t, &result);
+	return result;
+}
+
+extern "C" void fbu_decode_time(void *master_ptr, ISC_TIME time, unsigned* hours, unsigned* minutes, unsigned* seconds, unsigned* fractions)
+{
+	struct tm t = {};
+	isc_decode_sql_time(&time, &t);
+	*hours    = (unsigned)t.tm_hour;
+	*minutes  = (unsigned)t.tm_min;
+	*seconds  = (unsigned)t.tm_sec;
+	*fractions = 0;
+}
+
+extern "C" void fbu_decode_date(void *master_ptr, ISC_DATE date, unsigned* year, unsigned* month, unsigned* day)
+{
+	struct tm t = {};
+	isc_decode_sql_date(&date, &t);
+	*year  = (unsigned)(t.tm_year + 1900);
+	*month = (unsigned)(t.tm_mon + 1);
+	*day   = (unsigned)t.tm_mday;
+}
+
+#endif // FB_API_VER >= 30
+
+#if FB_API_VER >= 40
 static void fbu_copy_status(const ISC_STATUS* from, ISC_STATUS* to, size_t maxLength)
 {
 	for(size_t i=0; i < maxLength; ++i) {
@@ -60,9 +120,24 @@ static void fbu_copy_status(const ISC_STATUS* from, ISC_STATUS* to, size_t maxLe
 	}
 }
 
-#endif // FB_API_VER >= 30
+extern "C" void fbu_encode_time_tz(void *master_ptr, ISC_TIME_TZ* timeTz, unsigned hours, unsigned minutes, unsigned seconds, unsigned fractions, const char* timeZone)
+{
+	Firebird::IMaster* master = (Firebird::IMaster*)master_ptr;
+	Firebird::IUtil* util = master->getUtilInterface();
+	Firebird::IStatus* status = master->getStatus();
+	Firebird::CheckStatusWrapper st(status);
+	util->encodeTimeTz(&st, timeTz, hours, minutes, seconds, fractions, timeZone);
+}
 
-#if FB_API_VER >= 40
+extern "C" void fbu_encode_timestamp_tz(void *master_ptr, ISC_TIMESTAMP_TZ* timeStampTz, unsigned year, unsigned month, unsigned day, unsigned hours, unsigned minutes, unsigned seconds, unsigned fractions, const char* timeZone)
+{
+	Firebird::IMaster* master = (Firebird::IMaster*)master_ptr;
+	Firebird::IUtil* util = master->getUtilInterface();
+	Firebird::IStatus* status = master->getStatus();
+	Firebird::CheckStatusWrapper st(status);
+	util->encodeTimeStampTz(&st, timeStampTz, year, month, day, hours, minutes, seconds, fractions, timeZone);
+}
+
 /* Decodes a time with time zone into its time components. */
 extern "C" void fbu_decode_time_tz(void *master_ptr, const ISC_TIME_TZ* timeTz, unsigned* hours, unsigned* minutes, unsigned* seconds, unsigned* fractions,
    unsigned timeZoneBufferLength, char* timeZoneBuffer)
