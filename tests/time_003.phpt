@@ -13,6 +13,8 @@ skip_if_ext_lt(61);
 
 require("interbase.inc");
 require("common.inc");
+
+/** @var string $test_base */
 ibase_connect($test_base);
 test_time_unixtime();
 
@@ -32,5 +34,5 @@ array(3) {
   ["T1"]=>
   string(8) "15:45:59"
   ["T2"]=>
-  int(1762436759)
+  int(1762443959)
 }
