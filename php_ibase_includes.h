@@ -154,12 +154,6 @@ typedef struct {
 	short nullind;
 } BIND_BUF;
 
-typedef struct {
-	ISC_ARRAY_DESC ar_desc;
-	ISC_LONG ar_size; /* size of entire array in bytes */
-	unsigned short el_type, el_size;
-} ibase_array;
-
 typedef struct _ib_query {
 	ibase_db_link *link;
 	ibase_trans *trans;
@@ -167,9 +161,7 @@ typedef struct _ib_query {
 	zend_resource *res;
 	isc_stmt_handle stmt;
 	XSQLDA *in_sqlda, *out_sqlda;
-	ibase_array *in_array, *out_array;
 	unsigned short type, has_more_rows, is_open;
-	unsigned short in_array_cnt, out_array_cnt;
 	unsigned short dialect;
 	char *query;
 	ISC_UCHAR statement_type;
@@ -202,7 +194,6 @@ enum php_interbase_trans_option {
 /* fetch flags */
 enum php_interbase_fetch_option {
 	PHP_IBASE_FETCH_BLOBS        = 1,
-	PHP_IBASE_FETCH_ARRAYS       = 2,
 	PHP_IBASE_UNIXTIME           = 4,
 	PHP_IBASE_PHPDATE            = 8,
 };
