@@ -55,6 +55,14 @@
 #define FETCH_ROW       1
 #define FETCH_ARRAY     2
 
+#ifndef PHP_DATE_INIT_CTOR
+#	define PHP_DATE_INIT_CTOR   0x01
+#endif
+
+#ifndef PHP_DATE_INIT_FORMAT
+#	define PHP_DATE_INIT_FORMAT 0x02
+#endif
+
 static int le_query;
 
 static void _php_ibase_alloc_xsqlda_vars(XSQLDA *sqlda, ISC_SHORT *nullinds);
