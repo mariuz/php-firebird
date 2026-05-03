@@ -168,57 +168,77 @@ extern "C" int fbu_insert_field_info(void *master_ptr, ISC_STATUS* st, int is_ou
 
 #endif // FB_API_VER >= 40
 
-// Parse NUMERIC() to signed int representation
-int fbu_string_to_numeric(const char *s, size_t slen, int scale, uint64_t max,
-    int *sign, int *exp, uint64_t *res)
+#ifdef _MSC_VER
+#include <intrin.h>
+static int u64_mul10_gt(uint64_t r, uint64_t digit, uint64_t max, uint64_t *out)
 {
-    const char* p = s;
-    const char *end = s + slen;
+	uint64_t hi, lo = _umul128(r, 10, &hi);
+	if (hi || lo > max - digit) return 1;
+	*out = lo + digit;
+	return 0;
+}
+#else
+static int u64_mul10_gt(uint64_t r, uint64_t digit, uint64_t max, uint64_t *out)
+{
+	unsigned __int128 v = (unsigned __int128)r * 10 + digit;
+	if (v > max) return 1;
+	*out = (uint64_t)v;
+	return 0;
+}
+#endif
 
-    *sign = *exp = *res = 0;
+// Parse NUMERIC() to signed int representation
+// Currently not used, bet keep it around. Useful when converting NUMERIC fields
+// in integers. Might be usefult in the future.
+extern "C" int fbu_string_to_numeric(const char *s, size_t slen, int scale, uint64_t max,
+	int *sign, int *exp, uint64_t *res)
+{
+	const char* p = s;
+	const char *end = s + slen;
 
-    if (!slen) return STRNUM_PARSE_OK;
+	*sign = *exp = *res = 0;
 
-    if (*p == '-') {
-        *sign = -1;
-        p++;
-    } else if (*p == '+') {
-        *sign = 1;
-        p++;
-    } else {
-        *sign = 1;
-    }
+	if (!slen) return STRNUM_PARSE_OK;
 
-    if (*sign == -1) max += 1;
+	if (*p == '-') {
+		*sign = -1;
+		p++;
+	} else if (*p == '+') {
+		*sign = 1;
+		p++;
+	} else {
+		*sign = 1;
+	}
 
-    int fraction = 0;
-    uint64_t &r = *res;
-    while (p < end) {
-        if (*p >= '0' && *p <= '9') {
-            r = r * 10 + (*p - '0');
-            p++;
-            if (fraction) {
-                scale++;
-                --*exp;
-            }
-        } else if (*p == '.') {
-            if (fraction) return STRNUM_PARSE_ERROR;
-            fraction = 1;
-            p++;
-            continue;
-        } else {
-            return STRNUM_PARSE_ERROR;
-        }
+	if (*sign == -1) max += 1;
 
-        if (r > max) return STRNUM_PARSE_OVERFLOW;
-    }
+	int fraction = 0;
+	uint64_t r = *res;
+	while (p < end) {
+		if (*p >= '0' && *p <= '9') {
+			if (u64_mul10_gt(r, *p - '0', max, &r)) return STRNUM_PARSE_OVERFLOW;
+			p++;
+			if (fraction) {
+				scale++;
+				--*exp;
+			}
+		} else if (*p == '.') {
+			if (fraction) return STRNUM_PARSE_ERROR;
+			fraction = 1;
+			p++;
+			continue;
+		} else {
+			return STRNUM_PARSE_ERROR;
+		}
+	}
 
-    while (scale < 0) {
-        r *= 10;
-        if (r > max) return STRNUM_PARSE_OVERFLOW;
-        scale++;
-        --*exp;
-    }
+	while (scale < 0) {
+		if (u64_mul10_gt(r, 0, max, &r)) return STRNUM_PARSE_OVERFLOW;
+		scale++;
+		--*exp;
+	}
 
-    return STRNUM_PARSE_OK;
+	*res = r;
+
+	return STRNUM_PARSE_OK;
 }
