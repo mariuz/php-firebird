@@ -5,3 +5,4 @@ $password = 'masterkey';
 $host = "";
 ini_set('ibase.default_user',$user);
 ini_set('ibase.default_password',$password);
+ini_set('date.timezone', "UTC");
