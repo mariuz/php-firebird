@@ -1,11 +1,11 @@
 --TEST--
 InterBase: connect, close and pconnect
 --SKIPIF--
-<?php include("skipif.inc"); ?>
+<?php include(__DIR__."/skipif.inc"); ?>
 --FILE--
 <?php
 
-	require("interbase.inc");
+	require(__DIR__."/interbase.inc");
 
 	ibase_connect($test_base);
 	out_table("test1");
@@ -19,6 +19,7 @@ InterBase: connect, close and pconnect
 	ibase_close($pcon1);
 	unset($pcon1);
 
+	$pcon2 = ibase_connect($test_base); // As of 6.1.1-RC3 ibase_close() really closes the connection
 	out_table("test1");
 
 	ibase_close($pcon2);
