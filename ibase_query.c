@@ -1159,12 +1159,16 @@ _set_datetime:
 				if (flag & PHP_IBASE_PHPDATE) {
 					ZVAL_COPY(val, &t_dateo);
 				} else {
-					#if PHP_MAJOR_VERSION >= 8
+					#if PHP_VERSION_ID >= 80400
 						ZVAL_STR(val, php_format_date_obj(t_format, strlen(t_format), t_date_obj));
 					#else
 						zval format_zval, retval;
 						ZVAL_STRING(&format_zval, t_format);
-						zend_call_method_with_1_params(&t_dateo, php_date_get_date_ce(), NULL, "format", &retval, &format_zval);
+						#if PHP_MAJOR_VERSION >= 8
+							zend_call_method_with_1_params(Z_OBJ(t_dateo), php_date_get_date_ce(), NULL, "format", &retval, &format_zval);
+						#else
+							zend_call_method_with_1_params(&t_dateo, php_date_get_date_ce(), NULL, "format", &retval, &format_zval);
+						#endif
 						zval_ptr_dtor(&format_zval);
 						ZVAL_STR(val, Z_STR(retval));
 					#endif
