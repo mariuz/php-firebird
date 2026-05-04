@@ -499,6 +499,9 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 			case SQL_VARYING:
 cast_to_string:
 				convert_to_string(b_var);
+				if (Z_STRLEN_P(b_var) > SHRT_MAX - 2) {
+					fbp_fatal("Parameter %d: string buffer overflow (%zu bytes, max %d)", i+1, Z_STRLEN_P(b_var), SHRT_MAX - 2);
+				}
 				var->sqltype = SQL_TEXT | (var->sqltype & 1);
 				var->sqldata = Z_STRVAL_P(b_var);
 				var->sqllen = (ISC_SHORT)Z_STRLEN_P(b_var);
