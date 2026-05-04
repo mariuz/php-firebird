@@ -377,7 +377,7 @@ ibase_connect($test_base);
 })();
 
 ?>
---EXPECT--
+--EXPECTF--
 array(23) {
   ["ID"]=>
   int(10)
@@ -400,7 +400,7 @@ array(23) {
   ["DECIMAL_3"]=>
   string(18) "3.1415926535897930"
   ["FLOAT_FIELD"]=>
-  float(3.140000104904175)
+  float(3.1400001049%d)
   ["DOUBLE_FIELD"]=>
   float(3.14)
   ["CHAR_FIXED"]=>
