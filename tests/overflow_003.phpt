@@ -1,9 +1,9 @@
 --TEST--
-Integer overflow tests
+Integer overflow tests (32-bit)
 --SKIPIF--
 <?php
 include(__DIR__."/skipif.inc");
-if (PHP_INT_SIZE < 8) print "skip: only for 64-bit PHP"
+if (PHP_INT_SIZE > 4) print "skip: only for 32-bit PHP"
 ?>
 --FILE--
 <?php
@@ -19,20 +19,20 @@ ibase_connect($test_base);
 
     $data = [[
         'SMALLINT_1'       => 2**15-1,
-        'INTEGER_FIELD'    => 2**31-1,
-        'BIGINT_FIELD'     => PHP_INT_MAX,
+        'INTEGER_FIELD'    => PHP_INT_MAX,
+        'BIGINT_FIELD'     => "9223372036854775807",
     ], [
         'SMALLINT_1'       => -2**15,
-        'INTEGER_FIELD'    => -2**31,
-        'BIGINT_FIELD'     => PHP_INT_MIN,
+        'INTEGER_FIELD'    => PHP_INT_MIN,
+        'BIGINT_FIELD'     => "-9223372036854775808",
     ],[
         'SMALLINT_1'       => 2**15,
-        'INTEGER_FIELD'    => 2**31,
-        'BIGINT_FIELD'     => "9223372036854775808", // PHP_INT_MAX + 1
+        'INTEGER_FIELD'    => "2147483648", // PHP_INT_MAX + 1
+        'BIGINT_FIELD'     => "9223372036854775808",
     ],[
         'SMALLINT_1'       => -2**15-1,
-        'INTEGER_FIELD'    => -2**31-1,
-        'BIGINT_FIELD'     => "-9223372036854775809", // PHP_INT_MIN - 1
+        'INTEGER_FIELD'    => "-2147483649", // PHP_INT_MIN - 1
+        'BIGINT_FIELD'     => "-9223372036854775809",
     ]];
 
     $id = 0;
