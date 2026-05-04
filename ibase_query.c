@@ -232,6 +232,7 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 	zend_long long_val;
 	struct tm t;
 	const char *tformat = NULL;
+	int64_t long_min, long_max;
 
 	assert(ib_query->in_fields_count > 0);
 
@@ -337,6 +338,24 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 				switch (Z_TYPE_P(b_var))
 				{
 					case IS_LONG:
+						if (sqltype == SQL_SHORT) {
+							long_min = INT16_MIN;
+							long_max = INT16_MAX;
+						} else if (sqltype == SQL_LONG) {
+							long_min = INT32_MIN;
+							long_max = INT32_MAX;
+						} else if (sqltype == SQL_INT64) {
+							long_min = INT64_MIN;
+							long_max = INT64_MAX;
+						} else {
+							// Unreachable
+						}
+
+						// Let firebird handle overflows
+						if (long_val < long_min || long_val > long_max) {
+							goto cast_to_string;
+						}
+
 						long_val = Z_LVAL_P(b_var);
 						break;
 					case IS_TRUE:
