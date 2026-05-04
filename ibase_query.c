@@ -351,12 +351,13 @@ static int _php_ibase_bind(ibase_query *ib_query, zval *b_vars) /* {{{ */
 							// Unreachable
 						}
 
+						long_val = Z_LVAL_P(b_var);
+
 						// Let firebird handle overflows
 						if (long_val < long_min || long_val > long_max) {
 							goto cast_to_string;
 						}
 
-						long_val = Z_LVAL_P(b_var);
 						break;
 					case IS_TRUE:
 						long_val = 1;
