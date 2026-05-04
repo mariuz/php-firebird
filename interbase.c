@@ -1332,8 +1332,8 @@ void _php_ibase_populate_trans(zend_long trans_argl, zend_long trans_timeout, ch
 				} else {
 					last_tpb[tpb_len++] = isc_tpb_lock_timeout;
 					last_tpb[tpb_len++] = sizeof(ISC_SHORT);
-					last_tpb[tpb_len] = (ISC_SHORT)trans_timeout;
-					tpb_len += sizeof(ISC_SHORT);
+					last_tpb[tpb_len++] = (char)trans_timeout;
+					last_tpb[tpb_len++] = (char)(trans_timeout >> 8);
 				}
 			}
 		}
