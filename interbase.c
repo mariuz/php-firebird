@@ -1044,7 +1044,7 @@ int _php_ibase_attach_db(char **args, size_t *len, zend_long *largs, isc_db_hand
 }
 /* }}} */
 
-static void _php_ibase_connect(INTERNAL_FUNCTION_PARAMETERS, int persistent) /* {{{ */
+static void _php_ibase_connect(INTERNAL_FUNCTION_PARAMETERS, zend_long persistent) /* {{{ */
 {
 	char *c, hash[16], *args[] = { NULL, NULL, NULL, NULL, NULL };
 	int i;

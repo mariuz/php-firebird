@@ -529,24 +529,24 @@ parse_datetime: {
 
 		switch (sqltype) {
 			case SQL_TYPE_TIME:
-				buf->val.tmval = fbu_encode_time(IBG(master_instance), obj->time->h, obj->time->i, obj->time->s, obj->time->us);
+				buf->val.tmval = fbu_encode_time(IBG(master_instance), (unsigned)obj->time->h, (unsigned)obj->time->i, (unsigned)obj->time->s, (unsigned)obj->time->us);
 				break;
 			case SQL_TYPE_DATE:
-				buf->val.dtval = fbu_encode_date(IBG(master_instance), obj->time->y, obj->time->m, obj->time->d);
+				buf->val.dtval = fbu_encode_date(IBG(master_instance), (unsigned)obj->time->y, (unsigned)obj->time->m, (unsigned)obj->time->d);
 				break;
 			case SQL_TIMESTAMP:
 				ISC_TIMESTAMP *ts = &buf->val.tsval;
-				ts->timestamp_date = fbu_encode_date(IBG(master_instance), obj->time->y, obj->time->m, obj->time->d);
-				ts->timestamp_time = fbu_encode_time(IBG(master_instance), obj->time->h, obj->time->i, obj->time->s, obj->time->us);
+				ts->timestamp_date = fbu_encode_date(IBG(master_instance), (unsigned)obj->time->y, (unsigned)obj->time->m, (unsigned)obj->time->d);
+				ts->timestamp_time = fbu_encode_time(IBG(master_instance), (unsigned)obj->time->h, (unsigned)obj->time->i, (unsigned)obj->time->s, (unsigned)obj->time->us);
 				break;
 #if FB_API_VER >= 40
 			case SQL_TIME_TZ:
-				fbu_encode_time_tz(IBG(master_instance), &buf->val.tmval_tz, obj->time->h, obj->time->i, obj->time->s, obj->time->us, obj->time->tz_info->name);
+				fbu_encode_time_tz(IBG(master_instance), &buf->val.tmval_tz, (unsigned)obj->time->h, (unsigned)obj->time->i, (unsigned)obj->time->s, (unsigned)obj->time->us, obj->time->tz_info->name);
 				break;
 			case SQL_TIMESTAMP_TZ:
 				fbu_encode_timestamp_tz(IBG(master_instance), &buf->val.tsval_tz,
-					obj->time->y, obj->time->m, obj->time->d,
-					obj->time->h, obj->time->i, obj->time->s, obj->time->us,
+					(unsigned)obj->time->y, (unsigned)obj->time->m, (unsigned)obj->time->d,
+					(unsigned)obj->time->h, (unsigned)obj->time->i, (unsigned)obj->time->s, (unsigned)obj->time->us,
 					obj->time->tz_info->name
 				);
 				break;
@@ -1553,7 +1553,7 @@ PHP_FUNCTION(ibase_num_fields)
 }
 /* }}} */
 
-static void _php_ibase_field_info(zval *return_value, ibase_query *ib_query, int is_outvar, int num) /* {{{ */
+static void _php_ibase_field_info(zval *return_value, ibase_query *ib_query, int is_outvar, zend_long num) /* {{{ */
 {
 	unsigned short len;
 	char buf[16], *s = buf;
@@ -1595,7 +1595,7 @@ static void _php_ibase_field_info(zval *return_value, ibase_query *ib_query, int
 			RETURN_FALSE;
 		}
 
-		if(fbu_insert_field_info(IBG(master_instance), IB_STATUS, is_outvar, num, return_value, statement)){
+		if(fbu_insert_field_info(IBG(master_instance), IB_STATUS, is_outvar, (unsigned int)num, return_value, statement)){
 			fbu_release_statement(statement);
 			_php_ibase_error();
 			RETURN_FALSE;
@@ -1732,7 +1732,7 @@ PHP_FUNCTION(ibase_field_info)
 		return;
 	}
 
-	_php_ibase_field_info(return_value, ib_query, 1, (ISC_SHORT)field_arg);
+	_php_ibase_field_info(return_value, ib_query, 1, field_arg);
 }
 /* }}} */
 
@@ -1808,7 +1808,7 @@ static int _php_ibase_set_query_info(ibase_query *ib_query)
 	// Assume buf will be tagged with `isc_info_truncated` and later in parsing
 	// we will catch that. Until `isc_info_truncated` is reached assume pos +=
 	// 2, etc are safe.
-	if (isc_dsql_sql_info(IB_STATUS, &ib_query->stmt, sizeof(info_req), (ISC_SCHAR *)info_req, buf_size, (ISC_SCHAR *)buf)) {
+	if (isc_dsql_sql_info(IB_STATUS, &ib_query->stmt, sizeof(info_req), (ISC_SCHAR *)info_req, (short)buf_size, (ISC_SCHAR *)buf)) {
 		_php_ibase_error();
 		goto _php_ibase_parse_info_fail;
 	}

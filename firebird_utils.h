@@ -51,8 +51,8 @@ void fbu_decode_timestamp_tz(void *master_ptr, const ISC_TIMESTAMP_TZ* timestamp
 	unsigned* year, unsigned* month, unsigned* day,
 	unsigned* hours, unsigned* minutes, unsigned* seconds, unsigned* fractions,
 	unsigned timeZoneBufferLength, char* timeZoneBuffer);
-int fbu_insert_field_info(void *master_ptr, ISC_STATUS* st, int is_outvar, int num, zval *into_array, void *statement_ptr);
-int fbu_insert_aliases(void *master_ptr, ISC_STATUS* st, ibase_query *ib_query, void *statement_ptr);
+ISC_STATUS fbu_insert_field_info(void *master_ptr, ISC_STATUS* st, int is_outvar, unsigned int num, zval *into_array, void *statement_ptr);
+ISC_STATUS fbu_insert_aliases(void *master_ptr, ISC_STATUS* st, ibase_query *ib_query, void *statement_ptr);
 void fbu_release_statement(void *statement_ptr);
 #endif // FB_API_VER >= 4
 

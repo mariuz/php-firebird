@@ -171,13 +171,12 @@ extern "C" void fbu_release_statement(void *statement_ptr)
 	if (statement) statement->release();
 }
 
-extern "C" int fbu_insert_aliases(void *master_ptr, ISC_STATUS* st, ibase_query *ib_query, void *statement_ptr)
+extern "C" ISC_STATUS fbu_insert_aliases(void *master_ptr, ISC_STATUS* st, ibase_query *ib_query, void *statement_ptr)
 {
 	Firebird::IMaster* master = (Firebird::IMaster*)master_ptr;
 	Firebird::ThrowStatusWrapper status(master->getStatus());
 	Firebird::IStatement* statement = (Firebird::IStatement *)statement_ptr;
 	Firebird::IMessageMetadata* meta = NULL;
-	ISC_STATUS res;
 
 	try {
 		meta = statement->getOutputMetadata(&status);
@@ -192,7 +191,7 @@ extern "C" int fbu_insert_aliases(void *master_ptr, ISC_STATUS* st, ibase_query 
 
 		meta->release();
 	}
-	catch (const Firebird::FbException& error)
+	catch (Firebird::FbException&)
 	{
 		if (status.hasData())  {
 			fbu_copy_status((const ISC_STATUS*)status.getErrors(), st, 20);
@@ -205,14 +204,13 @@ extern "C" int fbu_insert_aliases(void *master_ptr, ISC_STATUS* st, ibase_query 
 	return 0;
 }
 
-extern "C" int fbu_insert_field_info(void *master_ptr, ISC_STATUS* st, int is_outvar, int num,
+extern "C" ISC_STATUS fbu_insert_field_info(void *master_ptr, ISC_STATUS* st, int is_outvar, unsigned int num,
 	zval *into_array, void *statement_ptr)
 {
 	Firebird::IMaster* master = (Firebird::IMaster*)master_ptr;
 	Firebird::ThrowStatusWrapper status(master->getStatus());
 	Firebird::IStatement* statement = (Firebird::IStatement *)statement_ptr;
 	Firebird::IMessageMetadata* meta = NULL;
-	ISC_STATUS res;
 
 	try {
 		if(is_outvar) {
@@ -232,7 +230,7 @@ extern "C" int fbu_insert_field_info(void *master_ptr, ISC_STATUS* st, int is_ou
 
 		meta->release();
 	}
-	catch (const Firebird::FbException& error)
+	catch (Firebird::FbException&)
 	{
 		if (status.hasData())  {
 			fbu_copy_status((const ISC_STATUS*)status.getErrors(), st, 20);
@@ -283,7 +281,8 @@ extern "C" int fbu_string_to_numeric(const char *s, size_t slen, int scale, uint
 	const char* p = s;
 	const char *end = s + slen;
 
-	*sign = *exp = *res = 0;
+	*sign = *exp = 0;
+	*res = 0;
 
 	if (!slen) return STRNUM_PARSE_OK;
 
