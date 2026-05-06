@@ -13,7 +13,9 @@ ini_set('ibase.default_charset', "UTF8");
 require("interbase.inc");
 require("common.inc");
 
-mb_internal_encoding("UTF-8") or die("mb_internal_encoding failed");
+if (function_exists("mb_internal_encoding")) {
+	mb_internal_encoding("UTF-8");
+}
 
 /** @var string $test_base */
 ibase_connect($test_base);
@@ -21,6 +23,10 @@ ibase_connect($test_base);
 (function() {
 	ibase_query(file_get_contents(__DIR__."/001-FIELDS25.sql"));
 	ibase_commit();
+
+	$str_len = static function(string $value): int {
+		return function_exists("mb_strlen") ? mb_strlen($value, "UTF-8") : strlen($value);
+	};
 
 	$data = [
 		0 => [
@@ -322,7 +328,7 @@ ibase_connect($test_base);
 
 			if ($row[$k] != $v) {
 				if (strpos($k, "CHAR_") === 0) {
-					$pad = str_repeat(" ", mb_strlen($row[$k]) - mb_strlen($v));
+					$pad = str_repeat(" ", $str_len($row[$k]) - $str_len($v));
 					if ($row[$k] === "$v$pad") {
 						continue;
 					}

@@ -15,7 +15,9 @@ ini_set('ibase.default_charset', "UTF8");
 require("interbase.inc");
 require("common.inc");
 
-mb_internal_encoding("UTF-8") or die("mb_internal_encoding failed");
+if (function_exists("mb_internal_encoding")) {
+	mb_internal_encoding("UTF-8");
+}
 
 /** @var string $test_base */
 ibase_connect($test_base);
